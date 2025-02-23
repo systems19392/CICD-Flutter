@@ -1,0 +1,99 @@
+workflows:
+  flutter-app:
+    name: Flutter App Workflow
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+
+    integrations:
+      app_store_connect: MVA AppStore Connect
+      # google_play: your-google-play-integration
+
+    environment:
+      flutter: stable # Set to flutter version, e.g., 3.16.0
+      ios_signing:
+        distribution_type: app_store # or ad_hoc | development | enterprise
+        bundle_identifier: qa.vodafone.mcare.test1
+      # android_signing:
+      #   - keystore_reference: your-keystore
+      #     keystore_password: $CM_KEYSTORE_PASSWORD
+      #     key_alias: $CM_KEY_ALIAS
+      #     key_password: $CM_KEY_PASSWORD
+      vars:
+        FLUTTER_BUILD_NAME: "1.0.0"
+        FLUTTER_BUILD_NUMBER: 1
+
+    triggering:
+      events:
+        - push
+        # - tag
+      branch_patterns:
+        - pattern: 'current'
+          include: true
+          source: true
+
+    scripts:
+      - name: Install Flutter dependencies
+        script: |
+          flutter packages get
+
+      - name: Run Flutter tests
+        script: |
+          flutter test || exit 1
+
+      - name: Increment build number (iOS + Android)
+        script: |
+          cd $CM_BUILD_DIR
+          if [ "$CM_TARGET_PLATFORM" == "ios" ]; then
+            LATEST_BUILD_NUMBER=$(app-store-connect get-latest-testflight-build-number "your_app_id" || echo 0)
+            NEW_BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1))
+            echo "🔢 New iOS build number: $NEW_BUILD_NUMBER"
+            agvtool new-version -all $NEW_BUILD_NUMBER
+          else
+            echo "ANDROID_BUILD_NUMBER=$((FLUTTER_BUILD_NUMBER + 1))" >> $CM_ENV
+          fi
+
+      - name: Build Flutter app (iOS)
+        script: |
+          flutter build ipa --release \
+            --build-name=$FLUTTER_BUILD_NAME \
+            --build-number=$FLUTTER_BUILD_NUMBER
+
+      - name: Build Flutter app (Android)
+        script: |
+          flutter build apk --release \
+            --build-name=$FLUTTER_BUILD_NAME \
+            --build-number=$FLUTTER_BUILD_NUMBER
+          flutter build appbundle --release \
+            --build-name=$FLUTTER_BUILD_NAME \
+            --build-number=$FLUTTER_BUILD_NUMBER
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - build/app/outputs/flutter-apk/*.apk
+      - build/app/outputs/bundle/release/*.aab
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      email:
+        recipients:
+          - atif.saeed@systemsltd.com
+        notify:
+          success: true
+          failure: true
+
+      # app_store_connect:
+      #   auth: integration
+      #   submit_to_testflight: true
+      
+      # google_play:
+      #   service_account: integration
+      #   track: internal
+      #   in_app_update_priority: 2
+      #   rollout_fraction: 0.1
+
+      slack:
+        channel: "#general"
+        notify_on_build_start: true
+        notify:
+          success: true
+          failure: true
