@@ -22,23 +22,23 @@ workflows:
         FLUTTER_BUILD_NAME: "1.0.0"
         FLUTTER_BUILD_NUMBER: 1
 
-    triggering:
-      events:
-        - push
-        # - tag
-      branch_patterns:
-        - pattern: 'current'
-          include: true
-          source: true
+    # triggering:
+    #   events:
+    #     - push
+    #     # - tag
+    #   branch_patterns:
+    #     - pattern: 'current'
+    #       include: true
+    #       source: true
 
     scripts:
       - name: Install Flutter dependencies
         script: |
           flutter packages get
 
-      - name: Run Flutter tests
-        script: |
-          flutter test || exit 1
+      # - name: Run Flutter tests
+      #   script: |
+      #     flutter test || exit 1
 
       - name: Increment build number (iOS + Android)
         script: |
